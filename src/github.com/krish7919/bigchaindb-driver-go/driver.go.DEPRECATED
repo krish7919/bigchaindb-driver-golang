@@ -1,0 +1,255 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type Transaction struct {
+	//tx corresponding to the version
+	// TODO Have a union-like struct here?
+	*TxPayloadVerZeroNine
+	//version number of the transaction model
+	Version string `json:"version"`
+}
+
+type TxPayloadVerZeroNine struct {
+	//The id of the transaction, and also the database primary key.
+	Id string `json:"id"`
+
+	//Type of the transaction
+	Operation OpType `json:"operation"`
+
+	//Description of the asset being transacted.
+	AssetObject *Asset `json:"asset"`
+
+	Inputs []Input `json:"inputs"`
+
+	Outputs []Output `json:"output"`
+
+	// TODO support for metadata
+	Metadata map[string]string `json:"metadata"`
+}
+
+//Input contains a pointer to an unspent output and a crypto fulfillment that
+//satisfies the conditions of that output. A fulfillment is usually a signature
+//proving the ownership of the asset.
+//An input spends a previous output, by providing one or more fulfillments that
+//fulfill the conditions of the previous output.
+type Input struct {
+	//List of public keys of the previous owners of the asset.
+	OwnersBefore []string `json:"owners_before"`
+
+	//A payload that satisfies the condition of a previous output to prove that
+	//the creator(s) of this transaction have control over the listed asset.
+	Fulfillment *OutputCondition `json:"fulfillment"`
+
+	//Reference to the output that is being spent.
+	Fulfills *Output `json:"fulfills"`
+}
+
+//Output contains crypto-conditions that need to be fulfilled by a transfer
+//transaction in order to transfer ownership to new owners.
+type Output struct {
+	//Integral amount of the asset represented by this condition.
+	Amount int `json:"amount"`
+
+	//List of public keys associated with the conditions on an output.
+	PublicKeys []string `json:"public_keys"`
+
+	Condition *OutputCondition `json:"condition"` // TODO ?
+}
+
+// Describes the condition that needs to be met to spend the output.
+type OutputCondition struct {
+	Details map[string]interface{} `json:"details"`
+	Uri string `json:""`
+}
+
+type Asset struct {
+	//	Data is always of the form:
+	//	{
+	//		"data": {
+	//			...
+	//		}
+	//	}
+	// Refer bdb-driver-py/offchain.py/prepare_create_transaction
+
+	Data map[string]interface{} `json:"data"`
+}
+
+func NewAsset(data map[string]interface{}) *Asset {
+	return &Asset{
+		Data: data}
+}
+
+func NewTransaction(
+	version string,
+	tx *TxPayloadVerZeroNine) *Transaction {
+	return &Transaction{
+		Version:              version,
+		TxPayloadVerZeroNine: tx,
+	}
+}
+
+func NewTxPayloadVerZeroNine(
+	id string,
+	op OpType,
+	asset *Asset,
+	inputs []Input,
+	outputs []Output,
+	metadata map[string]string) *TxPayloadVerZeroNine {
+	return &TxPayloadVerZeroNine{
+		Id:          id,
+		Operation:   op,
+		AssetObject: asset,
+		Inputs:      inputs,
+		Outputs:     outputs,
+		Metadata:    metadata,
+	}
+}
+
+func NewInput(
+	prevOwners []string,
+	outputCondition *OutputCondition,
+	output *Output) *Input {
+	return &Input{
+		OwnersBefore: prevOwners,
+		Fulfillment:  outputCondition,
+		Fulfills:     output,
+	}
+}
+
+func NewOutput(
+	amount int,
+	publicKeys []string,
+	outputCondition *OutputCondition) *Output {
+	return &Output{
+		Amount:     amount,
+		PublicKeys: publicKeys,
+		Condition:  outputCondition,
+	}
+}
+
+/* TODO
+func NewOutputCondition(
+    details ??,
+    uri string) *OutputCondition {
+    return &OutputCondition{
+        Details:
+        Uri: uri,
+    }
+}
+*/
+
+type Keypair struct {
+	PublicKey  string
+	PrivateKey string
+}
+
+// Returns a pair of (private_key, public_key) encoded in base58.
+func generateKeypair() *Keypair {
+	/* DEPRECATED: crypto lib uses /dev/random or /dev/urandom internally
+	fh, err := os.Open("/dev/urandom")
+	if err != nil {
+		panic(err)
+	}
+	defer fh.Close()
+	*/
+	// Create random public and private keys
+	publicKeyBytes, privateKeyBytes, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		panic(err)
+	}
+
+	publicKeyBase58 := base58.Encode(publicKeyBytes)
+	privateKeyBase58 := base58.Encode(privateKeyBytes)
+
+	return &Keypair{
+		PrivateKey: privateKeyBase58,
+		PublicKey:  publicKeyBase58,
+	}
+}
+
+func generateKeypairForAlice() *Keypair {
+	return &Keypair{
+		PrivateKey: "HDN1ajL1k1MyNvF7ETwT7K1Jdqw2yNAx4eN3TmDXtW7J",
+		PublicKey:  "AZhTRnY2QhX7rNqjPsfKDK4UJQhk9Hm6yecmpzQwRsrM",
+	}
+}
+
+func generateKeypairForBob() *Keypair {
+	return &Keypair{
+		PrivateKey: "6aoSvdZePgsCedHmFaidWXnGVpBgyrCBqb8xobsiF67",
+		PublicKey:  "Cs4byJu7ZqzTFfCnTwiQbCqDxoBgpeW3joSZ8MGQCmWg",
+	}
+}
+
+func createTransaction(
+	signers []ed25519.PublicKey,
+	recipients []ed25519.PublicKey,
+	asset *Asset,
+	metadata map[string]string,
+	inputs []Input,
+	outputs []Output) *Transaction {
+
+	// TODO sanity
+
+	// As per docs in py driver!
+	if recipients == nil {
+		recipients = signers
+	}
+	id := "id" //TODO
+	txZeroNine := NewTxPayloadVerZeroNine(
+		id,
+		OpCreate,
+		asset,
+		inputs,
+		outputs,
+		metadata)
+
+	tx := NewTransaction(VERSION, txZeroNine)
+	return tx
+}
+
+func main() {
+	// Step 1. Create a keypair for creator
+	creator := generateKeypair()
+	// Step 2. Create a keypair for receiver
+	receiver := generateKeypair()
+	fmt.Printf("Alice: %s\nBob: %s\n", creator, receiver)
+	// Step 3. Create Operation
+	// Step 3.1 Prepare tx for Create Op
+	// Step 3.1.1 Create the asset
+	assetData := map[string]interface{}{
+		"bicycle": map[string]interface{}{
+			"serial_number": "abcd1234",
+			"manufacturer":  "bkfab",
+		},
+	}
+	asset := NewAsset(assetData)
+	assetBytes, err := json.Marshal(asset)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(assetBytes))
+
+	// Step 3.1.2 Create the inputs
+	prevOwners := []string{creator.PublicKey}
+	input := NewInput(prevOwners, nil, nil)
+
+	// Step 3.1.3 Create the outputs
+	outputCondition *OutputCondition) *Output {
+	output := NewOutput(1, []string{creator.PublicKey, receiver.PublicKey},
+	)
+	// Step 3.1.4 Create the metadata
+	// Step 3.1.5 Create the full tx body
+
+	// Step 3.2. Fulfill tx for Create Op
+	// Sent 3.3. Sent Tx for Create Op
+	// Step 4. Transfer Operation
+	// Step 4.1 Prepare tx for Transfer Op
+	// Step 4.2. Fulfill tx for Transfer Op
+	// Sent 4.3. Sent Tx for TransferOp
+
+}

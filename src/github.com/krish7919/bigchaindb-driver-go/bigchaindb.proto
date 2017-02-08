@@ -1,0 +1,84 @@
+// A ProtoBuf schema for BigchainDB transactions.
+
+// protoc --go_out=. src/github.com/krish7919/bigchaindb-driver-go/bigchaindb.proto
+// go build src/github.com/krish7919/bigchaindb-driver-go/driver.go  src/github.com/krish7919/bigchaindb-driver-go/bigchaindb.pb.go
+
+syntax = "proto3";
+option go_package = "main";
+
+enum OperationType {
+	//option allow_alias = true;
+    CREATE = 0;
+    TRANSFER = 1;
+}
+
+message Transaction {
+	int32 version = 1 [json_name="version"];
+	oneof transaction {
+		TxSchemaZeroNine txZeroNine = 2;
+	    // TxSchemaOneZero txOneZero = 3;
+	}
+}
+
+message TxSchemaZeroNine {
+    Asset asset = 1 [json_name="asset"];
+    string id = 2 [json_name="id"];
+    repeated Input inputs = 3 [json_name="inputs"];
+    Metadata metadata = 4 [json_name="metadata"];
+    OperationType operation = 5 [json_name="operation"];
+    repeated Output outputs = 6 [json_name="outputs"];
+}
+
+message TxSchemaZeroEight {
+	string placeholder = 1;  //TODO Delete this
+}
+
+message Input {
+    OutputCondition fulfillment = 1 [json_name="fulfillment"];
+    Output fulfills = 2 [json_name="fulfills"];
+    repeated string owners_before = 3 [json_name="owners_before"];
+}
+
+message Output {
+    int32 amount = 1 [json_name="amount"];
+    OutputCondition condition = 2 [json_name="cond	ition"];
+    repeated string public_keys = 3 [json_name="public_keys"];
+}
+
+message OutputCondition {
+	string details = 1 [json_name="details"];
+	string uri = 2 [json_name="uri"];
+}
+
+message Asset {
+    string data = 1 [json_name="data"];
+}
+
+message Metadata {
+	map<string, string> metadata = 1 [json_name="metadata"];
+}
+
+message Keypair {
+    string public_key = 1 [json_name="public_key"];
+    string private_key = 2 [json_name="private_key"];
+}
+
+/*
+bytes
+service SearchService {
+	rpc Search (SearchRequest) returns (SearchResponse);
+}
+// NOTE: Arrange all the fields in the messages alphabetically!
+// As BDB server uses the sort_key=True functionality on the server side when
+// parsing the messages below in json.
+
+	book := &pb.AddressBook{}
+	// [START_EXCLUDE]
+	if err := proto.Unmarshal(in, book); err != nil {
+		log.Fatalln("Failed to parse address book:", err)
+	}
+	out, err := proto.Marshal(book)
+	if err != nil {
+		log.Fatalln("Failed to encode address book:", err)
+	}
+*/
