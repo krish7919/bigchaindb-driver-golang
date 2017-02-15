@@ -1,0 +1,234 @@
+/**
+* Copied from https://tools.ietf.org/html/draft-thomas-crypto-conditions-01
+* Appendix C.  ASN.1 Module
+* Use http://asn1-playground.oss.com/ for testing
+*/
+
+--<ASN1.PDU CryptoConditions.Condition, CryptoConditions.Fulfillment>--
+CryptoConditions
+DEFINITIONS
+AUTOMATIC TAGS ::=
+BEGIN
+
+/**
+* CONTAINERS
+*/
+
+Condition ::= SEQUENCE {
+	type ConditionType,
+	featureBitmask OCTET STRING,
+	fingerprint OCTET STRING,
+	maxFulfillmentLength INTEGER (0..MAX)
+}
+
+Fulfillment ::= SEQUENCE {
+	type ConditionType,
+	payload OCTET STRING
+}
+
+ConditionType ::= INTEGER {
+	preimageSha256(0),
+	rsaSha256(1),
+	prefixSha256(2),
+	thresholdSha256(3),
+	ed25519(4)
+} (0..65535)
+
+/**
+* FULFILLMENT PAYLOADS
+*/
+
+-- For preimage conditions, the payload equals the preimage
+
+PrefixSha256FulfillmentPayload ::= SEQUENCE {
+	prefix OCTET STRING,
+	subfulfillment Fulfillment
+}
+
+ThresholdSha256FulfillmentPayload ::= SEQUENCE {
+	threshold INTEGER (0..4294967295),
+	subfulfillments SEQUENCE OF ThresholdSubfulfillment
+}
+
+ThresholdSubfulfillment ::= SEQUENCE {
+	weight INTEGER (0..4294967295) DEFAULT 1,
+	condition Condition OPTIONAL,
+	fulfillment Fulfillment OPTIONAL
+}
+
+RsaSha256FulfillmentPayload ::= SEQUENCE {
+	modulus OCTET STRING (SIZE(128..512)),
+	signature OCTET STRING (SIZE(128..512))
+}
+
+Ed25519FulfillmentPayload ::= SEQUENCE {
+	publicKey OCTET STRING (SIZE(32)),
+	signature OCTET STRING (SIZE(64))
+}
+
+/**
+* FINGERPRINTS
+*/
+-- SHA-256 hash of the fingerprint contents
+Sha256Fingerprint ::= OCTET STRING (SIZE(32)) -- digest
+-- 32-byte Ed25519 public key
+Ed25519Fingerprint ::= OCTET STRING (SIZE(32)) -- publicKey
+
+/**
+* FINGERPRINT CONTENTS
+*
+* The content that will be hashed to arrive at the fingerprint.
+*/
+
+-- The preimage type hashes the raw contents of the preimage
+
+PrefixSha256FingerprintContents ::= SEQUENCE {
+	prefix OCTET STRING,
+	condition Condition
+}
+
+ThresholdSha256FingerprintContents ::= SEQUENCE {
+	threshold INTEGER (0..4294967295),
+	subconditions SEQUENCE OF ThresholdSubcondition
+}
+
+ThresholdSubcondition ::= SEQUENCE {
+	weight INTEGER (0..4294967295),
+	condition Condition
+}
+
+RsaSha256FingerprintContents ::= INTEGER (0..MAX) -- modulus
+
+/**
+ * EXAMPLES
+ */
+
+exampleCondition Condition ::=
+{
+	type preimageSha256,
+	featureBitmask '03'H,
+	fingerprint '
+	E3B0C442 98FC1C14 9AFBF4C8 996FB924 27AE41E4 649B934C A495991B 7852B855
+	'H,
+	maxFulfillmentLength 2
+}
+
+exampleFulfillment Fulfillment ::=
+{
+	type preimageSha256,
+	payload '00'H
+}
+exampleRsaSha256FulfillmentPayload RsaSha256FulfillmentPayload ::=
+{
+	modulus '
+	B30E7A93 8783BABF 836850FF 49E14F87 E3F92D5C 46E33FEC A3E4F0B2 2358580B
+	11765995 F4B8EEA7 FB4712C2 E1E316F7 F775A953 D232216A 169D9A64 DDC00712
+	0A400B37 F2AFC077 B62FE304 DE74DE6A 119EC407 6B529C4F 6096B0BA AD4F533D
+	F0173B9B 822FD85D 65FA4BEF A92D8F52 4F69CBCA 0136BD80 D095C169 AEC0E095
+	'H,
+	signature '
+	48E8945E FE007556 D5BF4D5F 249E4808 F7307E29 511D3262 DAEF61D8 8098F9AA
+	4A8BC062 3A8C9757 38F65D6B F459D543 F289D73C BC7AF4EA 3A33FBF3 EC444044
+	7911D722 94091E56 1833628E 49A772ED 608DE6C4 4595A91E 3E17D6CF 5EC3B252
+	8D63D2AD D6463989 B12EEC57 7DF64709 60DF6832 A9D84C36 0D1C217A D64C8625
+	BDB594FB 0ADA086C DECBBDE5 80D424BF 9746D2F0 C312826D BBB00AD6 8B52C4CB
+	7D47156B A35E3A98 1C973863 792CC80D 04A18021 0A524158 65B64B3A 61774B1D
+	3975D78A 98B0821E E55CA0F8 6305D425 29E10EB0 15CEFD40 2FB59B2A BB8DEEE5
+	2A6F2447 D2284603 D219CD4E 8CF9CFFD D5498889 C3780B59 DD6A57EF 7D732620
+	'H
+}
+
+exampleEd25519FulfillmentPayload Ed25519FulfillmentPayload ::=
+{
+	publicKey '
+	EC172B93 AD5E563B F4932C70 E1245034 C35467EF 2EFD4D64 EBF81968 3467E2BF
+	'H,
+	signature '
+	B62291FA D9432F8F 298B9C4A 4895DBE2 93F6FFDA 1A68DADF 0CCDEF5F 47A0C721
+	2A5FEA3C DA97A3F4 C03EA9F2 E8AC1CEC 86A51D45 2127ABDB A09D1B6F 331C070A
+	'H
+}
+
+END
+
+
+/*
+crypto/x509/pkix/pkix.go:19:	Parameters asn1.RawValue `asn1:"optional"`
+crypto/x509/pkix/pkix.go:37:	Value [][]AttributeTypeAndValue `asn1:"set"`
+crypto/x509/pkix/pkix.go:44:	Critical bool `asn1:"optional"`
+crypto/x509/pkix/pkix.go:180:	Version             int `asn1:"optional,default:0"`
+crypto/x509/pkix/pkix.go:184:	NextUpdate          time.Time            `asn1:"optional"`
+crypto/x509/pkix/pkix.go:185:	RevokedCertificates []RevokedCertificate `asn1:"optional"`
+crypto/x509/pkix/pkix.go:186:	Extensions          []Extension          `asn1:"tag:0,optional,explicit"`
+crypto/x509/pkix/pkix.go:194:	Extensions     []Extension `asn1:"optional"`
+crypto/x509/sec1.go:27:	NamedCurveOID asn1.ObjectIdentifier `asn1:"optional,explicit,tag:0"`
+crypto/x509/sec1.go:28:	PublicKey     asn1.BitString        `asn1:"optional,explicit,tag:1"`
+Binary file crypto/x509/.sec1.go.swp matches
+crypto/x509/pkcs1.go:23:	Dp   *big.Int `asn1:"optional"`
+crypto/x509/pkcs1.go:24:	Dq   *big.Int `asn1:"optional"`
+crypto/x509/pkcs1.go:25:	Qinv *big.Int `asn1:"optional"`
+crypto/x509/pkcs1.go:27:	AdditionalPrimes []pkcs1AdditionalRSAPrime `asn1:"optional,omitempty"`
+crypto/x509/x509.go:129:	Version            int `asn1:"optional,explicit,default:0,tag:0"`
+crypto/x509/x509.go:136:	UniqueId           asn1.BitString   `asn1:"optional,tag:1"`
+crypto/x509/x509.go:137:	SubjectUniqueId    asn1.BitString   `asn1:"optional,tag:2"`
+crypto/x509/x509.go:138:	Extensions         []pkix.Extension `asn1:"optional,explicit,tag:3"`
+crypto/x509/x509.go:163:	Id []byte `asn1:"optional,tag:0"`
+crypto/x509/x509.go:752:	IsCA       bool `asn1:"optional"`
+crypto/x509/x509.go:753:	MaxPathLen int  `asn1:"optional,default:-1"`
+crypto/x509/x509.go:764:	Permitted []generalSubtree `asn1:"optional,tag:0"`
+crypto/x509/x509.go:765:	Excluded  []generalSubtree `asn1:"optional,tag:1"`
+crypto/x509/x509.go:769:	Name string `asn1:"tag:2,optional,ia5"`
+crypto/x509/x509.go:780:	DistributionPoint distributionPointName `asn1:"optional,tag:0"`
+crypto/x509/x509.go:781:	Reason            asn1.BitString        `asn1:"optional,tag:1"`
+crypto/x509/x509.go:782:	CRLIssuer         asn1.RawValue         `asn1:"optional,tag:2"`
+crypto/x509/x509.go:786:	FullName     asn1.RawValue    `asn1:"optional,tag:0"`
+crypto/x509/x509.go:787:	RelativeName pkix.RDNSequence `asn1:"optional,tag:1"`
+crypto/x509/x509.go:1780:	RawAttributes []asn1.RawValue `asn1:"tag:0"`
+crypto/x509/x509.go:1834:		Values []asn1.RawValue `asn1:"set"`
+Binary file crypto/x509/.pkcs1.go.swp matches
+encoding/asn1/marshal_test.go:38:	A int `asn1:"implicit,tag:5"`
+encoding/asn1/marshal_test.go:42:	A int `asn1:"explicit,tag:5"`
+encoding/asn1/marshal_test.go:46:	A Flag `asn1:"tag:0,optional"`
+encoding/asn1/marshal_test.go:50:	A time.Time `asn1:"generalized"`
+encoding/asn1/marshal_test.go:54:	A string `asn1:"ia5"`
+encoding/asn1/marshal_test.go:58:	A string `asn1:"printable"`
+encoding/asn1/marshal_test.go:62:	A RawValue `asn1:"optional"`
+encoding/asn1/marshal_test.go:66:	A []string `asn1:"omitempty"`
+encoding/asn1/marshal_test.go:70:	A int `asn1:"optional,default:1"`
+encoding/asn1/marshal.go:510:		return fmt.Errorf("asn1: cannot marshal nil value")
+encoding/asn1/marshal.go:577:						return errors.New("asn1: string not valid UTF-8")
+Binary file encoding/asn1/.asn1.go.swp matches
+encoding/asn1/asn1_test.go:445:	A int `asn1:"tag:1"`
+encoding/asn1/asn1_test.go:449:	A int `asn1:"explicit,tag:1"`
+encoding/asn1/asn1_test.go:454:	S string `asn1:"tag:1,utf8"`
+encoding/asn1/asn1_test.go:467:	Ints []int `asn1:"set"`
+encoding/asn1/asn1_test.go:514:	Version            int `asn1:"optional,explicit,default:0,tag:0"`
+encoding/asn1/asn1_test.go:880:	Time time.Time `asn1:"explicit,tag:0"`
+encoding/asn1/asn1_test.go:909:	Time time.Time `asn1:"tag:24"`
+encoding/asn1/asn1_test.go:928:	Test int `asn1:"explicit,tag:0"`
+encoding/asn1/asn1_test.go:947:	Str string `asn1:"utf8"`
+encoding/asn1/asn1.go:38:func (e StructuralError) Error() string { return "asn1: structure error: " + e.Msg }
+encoding/asn1/asn1.go:45:func (e SyntaxError) Error() string { return "asn1: syntax error: " + e.Msg }
+encoding/asn1/asn1.go:329:		err = fmt.Errorf("asn1: time did not serialize back to the original value and may be invalid: given %q, but serialized as %q", s, serialized)
+encoding/asn1/asn1.go:352:		err = fmt.Errorf("asn1: time did not serialize back to the original value and may be invalid: given %q, but serialized as %q", s, serialized)
+encoding/asn1/asn1.go:419:		return "", errors.New("asn1: invalid UTF-8 string")
+encoding/asn1/asn1.go:448:		err = errors.New("asn1: internal error in parseTagAndLength")
+
+
+4.3.1
+The list of conditions is sorted first based on length, shortest
+   first.  Elements of the same length are sorted in lexicographic (big-
+   endian) order, smallest first.
+
+4.4
+
+   The signature algorithm used is RSASSA-PSS as defined in PKCS#1 v2.2.
+   [RFC3447]
+
+   Implementations MUST NOT use the default RSASSA-PSS-params.
+   Implementations MUST use the SHA-256 hash algorithm and therefor, the
+   same algorithm in the mask generation algorithm, as recommended in
+   [RFC3447].  Implementations MUST also use a salt length of 32 bytes
+   (equal to the size of the output from the SHA-256 algorithm).
+   Therefore the algorithm identifier will have the following value:
+*/
