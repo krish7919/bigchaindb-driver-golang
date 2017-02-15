@@ -4,39 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/btcsuite/btcutil/base58"
-	"github.com/jtremback/crypto-conditions"
-	"golang.org/x/crypto/ed25519"
+	"github.com/krish7919/cryptoconditions"
 )
 
 const (
 	bdbServer = "localhost:59984"
 	VERSION   = "0.9"
 )
-
-// Returns a pair of (private_key, public_key) encoded in base58.
-func generateKeypair() *Keypair {
-	//	DEPRECATED: crypto lib uses /dev/random or /dev/urandom internally
-	//	fh, err := os.Open("/dev/urandom")
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	defer fh.Close()
-
-	// Create random public and private keys
-	publicKeyBytes, privateKeyBytes, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		panic(err)
-	}
-
-	publicKeyBase58 := base58.Encode(publicKeyBytes)
-	privateKeyBase58 := base58.Encode(privateKeyBytes)
-
-	return &Keypair{
-		PrivateKey: privateKeyBase58,
-		PublicKey:  publicKeyBase58,
-	}
-}
 
 func generateKeypairForAlice() *Keypair {
 	return &Keypair{
@@ -90,9 +64,11 @@ func NewOutputCondition(
 
 func main() {
 	// Step 1. Create a keypair for creator
-	creator := generateKeypair()
+	creator := Keypair{}
+	creator.PublicKey, creator.PrivateKey = cryptoconditions.GenerateKeypair()
 	// Step 2. Create a keypair for receiver
-	receiver := generateKeypair()
+	receiver := Keypair{}
+	receiver.PublicKey, receiver.PrivateKey = cryptoconditions.GenerateKeypair()
 
 	fmt.Printf("DEBUG: Creator: %s\n", creator)
 	fmt.Printf("DEBUG: Receiver: %s\n", receiver)
@@ -124,21 +100,25 @@ func main() {
 	fmt.Printf("DEBUG: Input: %s\n", input)
 
 	// Step 3.1.3 Create the outputs
-	ed25519, err := CryptoConditions.ParseEd25519Fulfillment(
-		[]byte(creator.GetPublicKey()))
-	if err != nil {
-		fmt.Println(err)
-		panic(err)
+
+	details := "" //??
+	uri := &ConditionASCII{
+		FeatureType:          cryptoconditions.ConditionType.PREIMAGE_SHA256,
+		FeatureBitMask:       "",
+		Fingerprint:          "",
+		MaxFulfillmentLength: 0,
+	}.String()
+	outputCondition := NewOutputCondition(details, uri)
+	amount := 1
+	publicKeys := []string{creator.PublicKey}
+	output := NewOutput(amount, publicKeys, outputCondition)
+
+	ed25519FulfillmentPayload := []*Ed25519FulfillmentPayload{
+		{
+			PublicKey: creator.PublicKey,
+			Signature: nil,
+		},
 	}
-	fmt.Printf("DEBUG: ed25519: %s\n", ed25519)
-
-	//details:=
-	//uri:=
-	//outputCondition := NewOutputCondition()
-
-	//amount := 1
-	//publicKeys := []string{creator.PublicKey}
-	//output := NewOutput(amount, publicKeys, out?)
 
 	// Step 3.1.4 Create the metadata
 	// Step 3.1.5 Create the full tx body

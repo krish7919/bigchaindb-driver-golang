@@ -147,29 +147,6 @@ type Keypair struct {
 	PrivateKey string
 }
 
-// Returns a pair of (private_key, public_key) encoded in base58.
-func generateKeypair() *Keypair {
-	/* DEPRECATED: crypto lib uses /dev/random or /dev/urandom internally
-	fh, err := os.Open("/dev/urandom")
-	if err != nil {
-		panic(err)
-	}
-	defer fh.Close()
-	*/
-	// Create random public and private keys
-	publicKeyBytes, privateKeyBytes, err := ed25519.GenerateKey(nil)
-	if err != nil {
-		panic(err)
-	}
-
-	publicKeyBase58 := base58.Encode(publicKeyBytes)
-	privateKeyBase58 := base58.Encode(privateKeyBytes)
-
-	return &Keypair{
-		PrivateKey: privateKeyBase58,
-		PublicKey:  publicKeyBase58,
-	}
-}
 
 func generateKeypairForAlice() *Keypair {
 	return &Keypair{
