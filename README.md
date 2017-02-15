@@ -269,3 +269,17 @@ TXFR Sent Tx:
  }
 
 ####################################################
+
+
+
+Rough goals:
+- ease of use
+- form tx struct, get json and/or protobuf
+- driverhandles failover between nodes in a federation
+- federation discovery using nslookup?
+- maintain state?
+- support the event API with a long-lived connection?
+- https and http. spdy maybe?
+- fast
+- initial version handshake?
+
